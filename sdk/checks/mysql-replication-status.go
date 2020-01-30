@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"database/sql"
 	"fmt"
 
 	"github.com/davidpenn/sensu-plugins/sdk/sensu"
@@ -38,12 +39,12 @@ func NewMySQLReplicationStatusCommand() *cobra.Command {
 // MySQLReplicationStatus checks the replication status
 func MySQLReplicationStatus(db *sqlx.DB, warn, crit int) {
 	status := struct {
-		SlaveIOState        string `db:"Slave_IO_State"`
-		SlaveIORunning      string `db:"Slave_IO_Running"`
-		SlaveSQLRunning     string `db:"Slave_SQL_Running"`
-		LastIOError         string `db:"Last_IO_Error"`
-		LastSQLError        string `db:"Last_SQL_Error"`
-		SecondsBehindMaster int    `db:"Seconds_Behind_Master"`
+		SlaveIOState        string        `db:"Slave_IO_State"`
+		SlaveIORunning      string        `db:"Slave_IO_Running"`
+		SlaveSQLRunning     string        `db:"Slave_SQL_Running"`
+		LastIOError         string        `db:"Last_IO_Error"`
+		LastSQLError        string        `db:"Last_SQL_Error"`
+		SecondsBehindMaster sql.NullInt32 `db:"Seconds_Behind_Master"`
 	}{}
 
 	err := db.Unsafe().Get(&status, "SHOW SLAVE STATUS")
@@ -56,12 +57,12 @@ func MySQLReplicationStatus(db *sqlx.DB, warn, crit int) {
 		sensu.Exit(sensu.CriticalError, format, status.SlaveIORunning, status.SlaveSQLRunning, status.LastSQLError)
 	}
 
-	delay := status.SecondsBehindMaster
+	delay := int(status.SecondsBehindMaster.Int32)
 	message := fmt.Sprintf("replication delayed by %d", delay)
 	switch {
 	case delay >= crit:
 		sensu.Exit(sensu.CriticalError, message)
 	case delay >= warn:
-		sensu.Exit(sensu.CriticalError, message)
+		sensu.Exit(sensu.WarningError, message)
 	}
 }

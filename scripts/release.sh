@@ -3,14 +3,9 @@
 package_name=$(git rev-parse --show-toplevel | xargs basename)
 version=$(git describe --abbrev=0 --tags 2>/dev/null || git rev-parse HEAD 2>/dev/null)
 
-targets=(
-	"bin/darwin/amd64/check"
-	"bin/linux/amd64/check"
-	"bin/windows/amd64/check"
-)
+set -e
 
 [ ! -d dist/ ] && mkdir dist/
-
 if [ ! -z "$1" ]; then
 	cat <<EOF > dist/asset.yaml
 ---
@@ -26,16 +21,14 @@ spec:
 EOF
 fi
 
-for t in ${targets[@]}; do
-	[ ! -f $t ] && make $t
+arch=amd64
+targets=("darwin" "linux" "windows")
+for os in ${targets[@]}; do
+	rm -rf bin/
+	GOOS=${os} make
 
-	parts=(${t///// })
-	os=${parts[1]%/}
-	arch=${parts[2]%/}
 	filename=${package_name}_${version}_${os}_${arch}.tar.gz
-
-	# bsd tar
-	[ ! -f dist/$filename ] && tar -czvf dist/$filename -C $(dirname $t) -s /./bin/ .
+	[ ! -f dist/$filename ] && tar -czvf dist/$filename ./bin/
 
 	if [ ! -z "$1" ]; then
 		cat <<EOF >> dist/asset.yaml
